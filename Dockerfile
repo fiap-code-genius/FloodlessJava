@@ -24,9 +24,10 @@ FROM eclipse-temurin:17-jre-jammy
 
 # Definindo variáveis de ambiente para a JVM
 ENV JAVA_OPTS="-Xms512m -Xmx1024m"
+ENV PORT=8080
 
-# Expondo a porta 8080
-EXPOSE 8080
+# Expondo a porta definida pela variável de ambiente
+EXPOSE ${PORT}
 
 # Definindo o diretório de trabalho
 WORKDIR /app
@@ -34,5 +35,5 @@ WORKDIR /app
 # Copiando o arquivo JAR gerado para a imagem final
 COPY --from=build /app/target/Floodless-0.0.1-SNAPSHOT.jar app.jar
 
-# Configurando o ponto de entrada com as opções da JVM
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
+# Configurando o ponto de entrada com as opções da JVM e passando a porta como argumento
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar app.jar"] 
