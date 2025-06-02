@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -29,11 +31,10 @@ public class ClimaService {
 
     public void atualizarDadosClimaticos(Regiao regiao) {
         try {
-            // Buscar coordenadas no Nominatim
             String endereco = String.format("%s, %s, %s", regiao.getBairro(), regiao.getCidade(), regiao.getEstado());
             logger.info("Buscando coordenadas para endereço: {}", endereco);
 
-            JsonNode locationData = nominatimWebClient.get()
+            nominatimWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/search")
                             .queryParam("q", endereco)
@@ -42,21 +43,30 @@ public class ClimaService {
                             .build())
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    .block();
-
-            logger.info("Resposta do Nominatim: {}", locationData);
-
-            if (locationData != null && locationData.isArray() && locationData.size() > 0) {
-                JsonNode location = locationData.get(0);
-                double lat = location.get("lat").asDouble();
-                double lon = location.get("lon").asDouble();
-
-                logger.info("Coordenadas encontradas: lat={}, lon={}", lat, lon);
-
-                buscarDadosMeteorologicos(regiao, lat, lon);
-            }
+                    .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2)))
+                    .timeout(Duration.ofSeconds(10))
+                    .onErrorResume(e -> {
+                        logger.error("Erro ao buscar coordenadas: {}", e.getMessage());
+                        return Mono.empty();
+                    })
+                    .subscribe(locationData -> {
+                        if (locationData != null && locationData.isArray() && locationData.size() > 0) {
+                            JsonNode location = locationData.get(0);
+                            double lat = location.get("lat").asDouble();
+                            double lon = location.get("lon").asDouble();
+                            logger.info("Coordenadas encontradas: lat={}, lon={}", lat, lon);
+                            buscarDadosMeteorologicos(regiao, lat, lon);
+                        } else {
+                            logger.warn("Não foi possível encontrar coordenadas para o endereço: {}", endereco);
+                            definirDadosPadrao(regiao);
+                        }
+                    }, error -> {
+                        logger.error("Erro ao processar coordenadas: {}", error.getMessage());
+                        definirDadosPadrao(regiao);
+                    });
         } catch (Exception e) {
             logger.error("Erro ao atualizar dados climáticos: ", e);
+            definirDadosPadrao(regiao);
         }
     }
 
@@ -64,17 +74,35 @@ public class ClimaService {
         String openMeteoUrl = String.format("/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,precipitation,rain,showers,weathercode&hourly=precipitation_probability,precipitation&forecast_days=1", lat, lon);
         logger.info("URL Open-Meteo: {}", openMeteoUrl);
 
-        JsonNode weatherData = openMeteoWebClient.get()
+        openMeteoWebClient.get()
                 .uri(openMeteoUrl)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .block();
+                .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2)))
+                .timeout(Duration.ofSeconds(10))
+                .onErrorResume(e -> {
+                    logger.error("Erro ao buscar dados meteorológicos: {}", e.getMessage());
+                    return Mono.empty();
+                })
+                .subscribe(weatherData -> {
+                    if (weatherData != null) {
+                        processarDadosMeteorologicos(regiao, weatherData);
+                    } else {
+                        logger.warn("Não foi possível obter dados meteorológicos");
+                        definirDadosPadrao(regiao);
+                    }
+                }, error -> {
+                    logger.error("Erro ao processar dados meteorológicos: {}", error.getMessage());
+                    definirDadosPadrao(regiao);
+                });
+    }
 
-        logger.info("Resposta do Open-Meteo: {}", weatherData);
-
-        if (weatherData != null) {
-            processarDadosMeteorologicos(regiao, weatherData);
-        }
+    private void definirDadosPadrao(Regiao regiao) {
+        logger.info("Definindo dados padrão para a região: {}", regiao.getNome());
+        regiao.setTemperatura(25.0);
+        regiao.setNivelChuva(0.0);
+        regiao.setNivelRisco(NivelRisco.BAIXO);
+        regiao.setAreaRisco(false);
     }
 
     private void processarDadosMeteorologicos(Regiao regiao, JsonNode weatherData) {
