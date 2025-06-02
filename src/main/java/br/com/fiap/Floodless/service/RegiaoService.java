@@ -125,18 +125,35 @@ public class RegiaoService {
         logger.info("Iniciando atualização automática de todas as regiões");
         List<Regiao> regioes = regiaoRepository.findAll();
         
+        int sucessos = 0;
+        int falhas = 0;
+        
         for (Regiao regiao : regioes) {
             try {
-                logger.info("Atualizando dados climáticos para região: {}", regiao.getNome());
+                logger.info("Atualizando dados climáticos para região: {} ({}/{})", 
+                    regiao.getNome(), sucessos + falhas + 1, regioes.size());
+                    
                 climaService.atualizarDadosClimaticos(regiao);
                 regiaoRepository.save(regiao);
-                // Adiciona um delay de 10 segundos entre cada atualização de região
-                Thread.sleep(10000);
+                
+                // Aumenta o delay entre atualizações para 30 segundos
+                Thread.sleep(30000);
+                
+                sucessos++;
                 logger.info("Atualização concluída para região: {}", regiao.getNome());
             } catch (Exception e) {
-                logger.error("Erro ao atualizar região {}: {}", regiao.getNome(), e.getMessage());
+                falhas++;
+                logger.error("Erro ao atualizar região {}: {} - {}", 
+                    regiao.getNome(), e.getClass().getSimpleName(), e.getMessage());
             }
         }
-        logger.info("Atualização automática de todas as regiões concluída");
+        
+        logger.info("Atualização automática concluída. Sucessos: {}, Falhas: {}", sucessos, falhas);
+        
+        // Se todas as atualizações falharam, registra um alerta
+        if (falhas == regioes.size()) {
+            logger.error("ALERTA: Todas as atualizações de região falharam. Possível problema com as APIs externas.");
+        }
     }
+} 
 } 

@@ -16,6 +16,9 @@ import java.time.LocalDateTime;
 @Service
 public class ClimaService {
     private static final Logger logger = LoggerFactory.getLogger(ClimaService.class);
+    private static final int MAX_FALHAS_CONSECUTIVAS = 3;
+    private int falhasConsecutivas = 0;
+    private LocalDateTime ultimaFalha;
 
     // Constantes para classificação de risco baseadas em critérios técnicos
     // Até 25mm/h - Chuva fraca a moderada
@@ -29,7 +32,38 @@ public class ClimaService {
     @Autowired
     private WebClient openMeteoWebClient;
 
+    private synchronized void registrarFalha() {
+        falhasConsecutivas++;
+        ultimaFalha = LocalDateTime.now();
+        if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) {
+            logger.error("ALERTA: {} falhas consecutivas detectadas. Possível problema com as APIs externas.", MAX_FALHAS_CONSECUTIVAS);
+        }
+    }
+
+    private synchronized void resetarFalhas() {
+        falhasConsecutivas = 0;
+        ultimaFalha = null;
+    }
+
+    private synchronized boolean deveUsarFallback() {
+        if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) {
+            // Se passou mais de 5 minutos desde a última falha, tenta novamente
+            if (ultimaFalha != null && ultimaFalha.plusMinutes(5).isBefore(LocalDateTime.now())) {
+                resetarFalhas();
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
     public void atualizarDadosClimaticos(Regiao regiao) {
+        if (deveUsarFallback()) {
+            logger.warn("Circuit breaker ativo. Usando valores padrão para {}", regiao.getNome());
+            definirDadosPadrao(regiao);
+            return;
+        }
+
         try {
             String endereco = String.format("%s, %s, %s", regiao.getBairro(), regiao.getCidade(), regiao.getEstado());
             logger.info("Buscando coordenadas para endereço: {}", endereco);
@@ -45,11 +79,12 @@ public class ClimaService {
                     .bodyToMono(JsonNode.class)
                     .retryWhen(Retry.backoff(4, Duration.ofSeconds(5))
                             .maxBackoff(Duration.ofSeconds(30))
-                            .jitter(0.3) // 30% de variação aleatória
-                            .filter(throwable -> shouldRetry(throwable))) // Filtra quais erros devem ser retentados
+                            .jitter(0.3)
+                            .filter(throwable -> shouldRetry(throwable)))
                     .timeout(Duration.ofSeconds(30))
                     .onErrorResume(e -> {
                         logger.error("Erro ao buscar coordenadas: {} - {}", e.getClass().getSimpleName(), e.getMessage());
+                        registrarFalha();
                         return Mono.empty();
                     })
                     .subscribe(locationData -> {
@@ -59,16 +94,20 @@ public class ClimaService {
                             double lon = location.get("lon").asDouble();
                             logger.info("Coordenadas encontradas: lat={}, lon={}", lat, lon);
                             buscarDadosMeteorologicos(regiao, lat, lon);
+                            resetarFalhas(); // Reseta contador de falhas em caso de sucesso
                         } else {
                             logger.warn("Não foi possível encontrar coordenadas para o endereço: {}", endereco);
+                            registrarFalha();
                             definirDadosPadrao(regiao);
                         }
                     }, error -> {
-                        logger.error("Erro ao processar coordenadas: {}", error.getMessage());
+                        logger.error("Erro ao processar coordenadas: {} - {}", error.getClass().getSimpleName(), error.getMessage());
+                        registrarFalha();
                         definirDadosPadrao(regiao);
                     });
         } catch (Exception e) {
-            logger.error("Erro ao atualizar dados climáticos: ", e);
+            logger.error("Erro ao atualizar dados climáticos: {} - {}", e.getClass().getSimpleName(), e.getMessage());
+            registrarFalha();
             definirDadosPadrao(regiao);
         }
     }
