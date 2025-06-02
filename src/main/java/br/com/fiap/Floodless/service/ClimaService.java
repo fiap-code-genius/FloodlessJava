@@ -43,8 +43,8 @@ public class ClimaService {
                             .build())
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2)))
-                    .timeout(Duration.ofSeconds(10))
+                    .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(10)))
+                    .timeout(Duration.ofSeconds(30))
                     .onErrorResume(e -> {
                         logger.error("Erro ao buscar coordenadas: {}", e.getMessage());
                         return Mono.empty();
@@ -78,8 +78,8 @@ public class ClimaService {
                 .uri(openMeteoUrl)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(2)))
-                .timeout(Duration.ofSeconds(10))
+                .retryWhen(Retry.fixedDelay(3, Duration.ofSeconds(10)))
+                .timeout(Duration.ofSeconds(30))
                 .onErrorResume(e -> {
                     logger.error("Erro ao buscar dados meteorológicos: {}", e.getMessage());
                     return Mono.empty();

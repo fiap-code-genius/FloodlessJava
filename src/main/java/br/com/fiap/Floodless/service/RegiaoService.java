@@ -130,8 +130,8 @@ public class RegiaoService {
                 logger.info("Atualizando dados climáticos para região: {}", regiao.getNome());
                 climaService.atualizarDadosClimaticos(regiao);
                 regiaoRepository.save(regiao);
-                // Adiciona um delay de 2 segundos entre cada atualização de região
-                Thread.sleep(2000);
+                // Adiciona um delay de 10 segundos entre cada atualização de região
+                Thread.sleep(10000);
                 logger.info("Atualização concluída para região: {}", regiao.getNome());
             } catch (Exception e) {
                 logger.error("Erro ao atualizar região {}: {}", regiao.getNome(), e.getMessage());
