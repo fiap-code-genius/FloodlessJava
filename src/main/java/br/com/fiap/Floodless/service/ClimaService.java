@@ -43,11 +43,13 @@ public class ClimaService {
                             .build())
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(10))
-                            .maxBackoff(Duration.ofSeconds(20)))
+                    .retryWhen(Retry.backoff(4, Duration.ofSeconds(5))
+                            .maxBackoff(Duration.ofSeconds(30))
+                            .jitter(0.3) // 30% de variação aleatória
+                            .filter(throwable -> shouldRetry(throwable))) // Filtra quais erros devem ser retentados
                     .timeout(Duration.ofSeconds(30))
                     .onErrorResume(e -> {
-                        logger.error("Erro ao buscar coordenadas: {}", e.getMessage());
+                        logger.error("Erro ao buscar coordenadas: {} - {}", e.getClass().getSimpleName(), e.getMessage());
                         return Mono.empty();
                     })
                     .subscribe(locationData -> {
@@ -79,11 +81,13 @@ public class ClimaService {
                 .uri(openMeteoUrl)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(3, Duration.ofSeconds(10))
-                        .maxBackoff(Duration.ofSeconds(20)))
+                .retryWhen(Retry.backoff(4, Duration.ofSeconds(5))
+                        .maxBackoff(Duration.ofSeconds(30))
+                        .jitter(0.3) // 30% de variação aleatória
+                        .filter(throwable -> shouldRetry(throwable))) // Filtra quais erros devem ser retentados
                 .timeout(Duration.ofSeconds(30))
                 .onErrorResume(e -> {
-                    logger.error("Erro ao buscar dados meteorológicos: {}", e.getMessage());
+                    logger.error("Erro ao buscar dados meteorológicos: {} - {}", e.getClass().getSimpleName(), e.getMessage());
                     return Mono.empty();
                 })
                 .subscribe(weatherData -> {
@@ -266,5 +270,20 @@ public class ClimaService {
         } else {
             return NivelRisco.BAIXO;
         }
+    }
+
+    private boolean shouldRetry(Throwable throwable) {
+        // Não retentar em caso de erros 4xx (exceto 429 - Too Many Requests)
+        if (throwable instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
+            org.springframework.web.reactive.function.client.WebClientResponseException ex = 
+                (org.springframework.web.reactive.function.client.WebClientResponseException) throwable;
+            int statusCode = ex.getStatusCode().value();
+            return statusCode == 429 || statusCode >= 500;
+        }
+        // Retentar em caso de erros de timeout ou conexão
+        return throwable instanceof java.net.SocketTimeoutException ||
+               throwable instanceof java.net.ConnectException ||
+               throwable instanceof io.netty.channel.ConnectTimeoutException ||
+               throwable instanceof java.io.IOException;
     }
 } 
