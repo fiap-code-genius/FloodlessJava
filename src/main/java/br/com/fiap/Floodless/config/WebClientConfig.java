@@ -16,11 +16,11 @@ public class WebClientConfig {
 
     private HttpClient createHttpClient() {
         return HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-                .responseTimeout(Duration.ofSeconds(5))
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
+                .responseTimeout(Duration.ofSeconds(30))
                 .doOnConnected(conn -> 
-                    conn.addHandlerLast(new ReadTimeoutHandler(5, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(5, TimeUnit.SECONDS)));
+                    conn.addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
     }
 
     @Bean
@@ -28,7 +28,7 @@ public class WebClientConfig {
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(createHttpClient()))
                 .baseUrl("https://nominatim.openstreetmap.org")
-                .defaultHeader("User-Agent", "Floodless/1.0")
+                .defaultHeader("User-Agent", "Floodless/1.0 (https://floodless.onrender.com)")
                 .build();
     }
 
@@ -37,6 +37,7 @@ public class WebClientConfig {
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(createHttpClient()))
                 .baseUrl("https://api.open-meteo.com")
+                .defaultHeader("User-Agent", "Floodless/1.0 (https://floodless.onrender.com)")
                 .build();
     }
 } 
