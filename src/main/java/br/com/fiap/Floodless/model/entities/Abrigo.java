@@ -1,5 +1,6 @@
 package br.com.fiap.Floodless.model.entities;
 
+import br.com.fiap.Floodless.dto.AbrigoRequestDTO;
 import jakarta.persistence.*;
 
 @Entity
@@ -34,13 +35,28 @@ public class Abrigo {
     @Column(name = "ativo")
     private Boolean ativo = true;
 
+    @Column(name = "disponivel")
+    private Boolean disponivel = true;
+
     @ManyToOne
     @JoinColumn(name = "id_regiao")
     private Regiao regiao;
 
     public Abrigo() {}
 
-    public Abrigo(Long id, String nome, String descricao, String endereco, Integer capacidadeMaxima, Integer ocupacaoAtual, String telefoneContato, String emailContato, Boolean ativo, Regiao regiao) {
+    public Abrigo(AbrigoRequestDTO dto) {
+        this.nome = dto.nome();
+        this.descricao = dto.descricao();
+        this.endereco = dto.endereco();
+        this.capacidadeMaxima = dto.capacidadeMaxima();
+        this.ocupacaoAtual = dto.ocupacaoAtual();
+        this.telefoneContato = dto.telefoneContato();
+        this.emailContato = dto.emailContato();
+        this.ativo = dto.ativo() != null ? dto.ativo() : true;
+        this.disponivel = dto.disponivel() != null ? dto.disponivel() : true;
+    }
+
+    public Abrigo(Long id, String nome, String descricao, String endereco, Integer capacidadeMaxima, Integer ocupacaoAtual, String telefoneContato, String emailContato, Boolean ativo, Boolean disponivel, Regiao regiao) {
         this.id = id;
         this.nome = nome;
         this.descricao = descricao;
@@ -50,10 +66,11 @@ public class Abrigo {
         this.telefoneContato = telefoneContato;
         this.emailContato = emailContato;
         this.ativo = ativo;
+        this.disponivel = disponivel;
         this.regiao = regiao;
     }
 
-    public Abrigo(Long id, String nome, String descricao, String endereco, Integer capacidadeMaxima, Integer ocupacaoAtual, String telefoneContato, String emailContato, Boolean ativo) {
+    public Abrigo(Long id, String nome, String descricao, String endereco, Integer capacidadeMaxima, Integer ocupacaoAtual, String telefoneContato, String emailContato, Boolean ativo, Boolean disponivel) {
         this.id = id;
         this.nome = nome;
         this.descricao = descricao;
@@ -63,6 +80,7 @@ public class Abrigo {
         this.telefoneContato = telefoneContato;
         this.emailContato = emailContato;
         this.ativo = ativo;
+        this.disponivel = disponivel;
     }
 
     public Long getId() {
@@ -135,6 +153,14 @@ public class Abrigo {
 
     public void setAtivo(Boolean ativo) {
         this.ativo = ativo;
+    }
+
+    public Boolean getDisponivel() {
+        return disponivel;
+    }
+
+    public void setDisponivel(Boolean disponivel) {
+        this.disponivel = disponivel;
     }
 
     public Regiao getRegiao() {
