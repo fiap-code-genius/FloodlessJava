@@ -209,10 +209,62 @@ docker run -p 8080:8080 \
 
 4. **Models** (`/model`)
    - Entidades JPA
-   - DTOs para request/response
    - Enums e classes auxiliares
    - Mapeamentos objeto-relacional
-   - Validações de dados
+
+5. **DTOs** (`/dto`)
+   - **Request DTOs**: Objetos de transferência para entrada de dados
+     - Validações com Bean Validation
+     - Documentação Swagger
+     - Exemplo: `UsuarioRequestDTO`
+       ```java
+       public record UsuarioRequestDTO(
+           @NotBlank String nome,
+           @Email String email,
+           @NotBlank String senha,
+           String telefone,
+           Boolean receberNotificacoes,
+           Boolean receberAlertas,
+           Long regiaoId
+       ) {}
+       ```
+   
+   - **Response DTOs**: Objetos de transferência para saída de dados
+     - Mapeamento de entidades para DTOs
+     - Ocultação de dados sensíveis
+     - Exemplo: `UsuarioResponseDTO`
+       ```java
+       public record UsuarioResponseDTO(
+           Long id,
+           String nome,
+           String email,
+           String telefone,
+           Boolean receberNotificacoes,
+           Boolean receberAlertas,
+           RegiaoResponseDTO regiao
+       ) {
+           public UsuarioResponseDTO(Usuario usuario) {
+               this(
+                   usuario.getId(),
+                   usuario.getNome(),
+                   usuario.getEmail(),
+                   usuario.getTelefone(),
+                   usuario.getReceberNotificacoes(),
+                   usuario.getReceberAlertas(),
+                   usuario.getRegiao() != null ? 
+                       new RegiaoResponseDTO(usuario.getRegiao()) : 
+                       null
+               );
+           }
+       }
+       ```
+
+   - **Benefícios do uso de DTOs**:
+     - Separação clara entre camada de API e domínio
+     - Controle preciso dos dados expostos
+     - Validação específica para cada operação
+     - Versionamento facilitado da API
+     - Documentação mais clara no Swagger
 
 ## 🔍 Monitoramento
 
