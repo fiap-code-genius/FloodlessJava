@@ -16,11 +16,11 @@ public class WebClientConfig {
 
     private HttpClient createHttpClient() {
         return HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
-                .responseTimeout(Duration.ofSeconds(30))
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 60000)
+                .responseTimeout(Duration.ofSeconds(60))
                 .doOnConnected(conn -> 
-                    conn.addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
+                    conn.addHandlerLast(new ReadTimeoutHandler(60, TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(60, TimeUnit.SECONDS)))
                 .option(ChannelOption.TCP_NODELAY, true)
                 .option(ChannelOption.SO_KEEPALIVE, true);
     }

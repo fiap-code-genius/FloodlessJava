@@ -12,12 +12,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class RegiaoService {
     private static final Logger logger = LoggerFactory.getLogger(RegiaoService.class);
+    private static final Duration INTERVALO_ATUALIZACAO = Duration.ofMinutes(2);
+    private LocalDateTime ultimaAtualizacao;
 
     @Autowired
     private RegiaoRepository regiaoRepository;
@@ -120,8 +124,15 @@ public class RegiaoService {
         regiaoRepository.deleteById(id);
     }
 
-    @Scheduled(fixedRate = 3600000) // Executa a cada 1 hora (3600000 ms)
+    @Scheduled(fixedRate = 3600000) // Executa a cada 1 hora
     public void atualizarTodasRegioes() {
+        // Verifica se já passou tempo suficiente desde a última atualização
+        if (ultimaAtualizacao != null && 
+            Duration.between(ultimaAtualizacao, LocalDateTime.now()).compareTo(INTERVALO_ATUALIZACAO) < 0) {
+            logger.info("Ignorando atualização automática - intervalo mínimo não atingido");
+            return;
+        }
+
         logger.info("Iniciando atualização automática de todas as regiões");
         List<Regiao> regioes = regiaoRepository.findAll();
         
@@ -136,11 +147,15 @@ public class RegiaoService {
                 climaService.atualizarDadosClimaticos(regiao);
                 regiaoRepository.save(regiao);
                 
-                // Aumenta o delay entre atualizações para 30 segundos
-                Thread.sleep(30000);
+                // Aumenta o delay entre atualizações para 2 minutos
+                Thread.sleep(120000);
                 
                 sucessos++;
                 logger.info("Atualização concluída para região: {}", regiao.getNome());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("Processo de atualização interrompido");
+                break;
             } catch (Exception e) {
                 falhas++;
                 logger.error("Erro ao atualizar região {}: {} - {}", 
@@ -148,6 +163,7 @@ public class RegiaoService {
             }
         }
         
+        ultimaAtualizacao = LocalDateTime.now();
         logger.info("Atualização automática concluída. Sucessos: {}, Falhas: {}", sucessos, falhas);
         
         // Se todas as atualizações falharam, registra um alerta
