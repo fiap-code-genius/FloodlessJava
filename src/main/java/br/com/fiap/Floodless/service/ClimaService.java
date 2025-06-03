@@ -95,13 +95,13 @@ public class ClimaService {
             Optional<Coordenadas> coordenadasCached = getCoordenadas(endereco);
             if (coordenadasCached.isPresent()) {
                 Coordenadas coords = coordenadasCached.get();
-                buscarDadosMeteorologicos(regiao, coords.lat(), coords.lon());
+                buscarDadosMeteorologicosSincrono(regiao, coords.lat(), coords.lon());
                 return;
             }
 
             logger.info("Buscando coordenadas para endereço: {}", endereco);
 
-            nominatimWebClient.get()
+            JsonNode locationData = nominatimWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/search")
                             .queryParam("q", endereco)
@@ -113,28 +113,24 @@ public class ClimaService {
                     .retryWhen(Retry.backoff(3, Duration.ofSeconds(10))
                             .maxBackoff(Duration.ofSeconds(30))
                             .filter(throwable -> shouldRetry(throwable)))
-                    .subscribe(locationData -> {
-                        if (locationData != null && locationData.isArray() && locationData.size() > 0) {
-                            JsonNode location = locationData.get(0);
-                            double lat = location.get("lat").asDouble();
-                            double lon = location.get("lon").asDouble();
-                            
-                            // Salva no cache
-                            coordenadasCache.put(endereco, Coordenadas.of(lat, lon));
-                            
-                            logger.info("Coordenadas encontradas: lat={}, lon={}", lat, lon);
-                            buscarDadosMeteorologicos(regiao, lat, lon);
-                            resetarFalhas();
-                        } else {
-                            logger.warn("Não foi possível encontrar coordenadas para o endereço: {}", endereco);
-                            registrarFalha();
-                            definirDadosPadrao(regiao);
-                        }
-                    }, error -> {
-                        logger.error("Erro ao processar coordenadas: {} - {}", error.getClass().getSimpleName(), error.getMessage());
-                        registrarFalha();
-                        definirDadosPadrao(regiao);
-                    });
+                    .block(Duration.ofSeconds(60));
+
+            if (locationData != null && locationData.isArray() && locationData.size() > 0) {
+                JsonNode location = locationData.get(0);
+                double lat = location.get("lat").asDouble();
+                double lon = location.get("lon").asDouble();
+                
+                // Salva no cache
+                coordenadasCache.put(endereco, Coordenadas.of(lat, lon));
+                
+                logger.info("Coordenadas encontradas: lat={}, lon={}", lat, lon);
+                buscarDadosMeteorologicosSincrono(regiao, lat, lon);
+                resetarFalhas();
+            } else {
+                logger.warn("Não foi possível encontrar coordenadas para o endereço: {}", endereco);
+                registrarFalha();
+                definirDadosPadrao(regiao);
+            }
         } catch (Exception e) {
             logger.error("Erro ao atualizar dados climáticos: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             registrarFalha();
@@ -142,28 +138,30 @@ public class ClimaService {
         }
     }
 
-    private void buscarDadosMeteorologicos(Regiao regiao, double lat, double lon) {
+    private void buscarDadosMeteorologicosSincrono(Regiao regiao, double lat, double lon) {
         String openMeteoUrl = String.format("/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,precipitation,rain,showers,weathercode&hourly=precipitation_probability,precipitation&forecast_days=1", lat, lon);
         logger.info("URL Open-Meteo: {}", openMeteoUrl);
 
-        openMeteoWebClient.get()
-                .uri(openMeteoUrl)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(3, Duration.ofSeconds(10))
-                        .maxBackoff(Duration.ofSeconds(30))
-                        .filter(throwable -> shouldRetry(throwable)))
-                .subscribe(weatherData -> {
-                    if (weatherData != null) {
-                        processarDadosMeteorologicos(regiao, weatherData);
-                    } else {
-                        logger.warn("Não foi possível obter dados meteorológicos");
-                        definirDadosPadrao(regiao);
-                    }
-                }, error -> {
-                    logger.error("Erro ao processar dados meteorológicos: {}", error.getMessage());
-                    definirDadosPadrao(regiao);
-                });
+        try {
+            JsonNode weatherData = openMeteoWebClient.get()
+                    .uri(openMeteoUrl)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(10))
+                            .maxBackoff(Duration.ofSeconds(30))
+                            .filter(throwable -> shouldRetry(throwable)))
+                    .block(Duration.ofSeconds(60));
+
+            if (weatherData != null) {
+                processarDadosMeteorologicos(regiao, weatherData);
+            } else {
+                logger.warn("Não foi possível obter dados meteorológicos");
+                definirDadosPadrao(regiao);
+            }
+        } catch (Exception e) {
+            logger.error("Erro ao buscar dados meteorológicos: {}", e.getMessage());
+            definirDadosPadrao(regiao);
+        }
     }
 
     private void definirDadosPadrao(Regiao regiao) {
