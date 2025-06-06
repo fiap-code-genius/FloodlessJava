@@ -828,7 +828,7 @@ O sistema utiliza SLF4J para logging com diferentes níveis:
 2. **Abrigo**
    - Capacidade: Maior que zero
    - Ocupação: Não pode exceder capacidade
-   - Remoção: Apenas se vazio
+   - Remoção: Apenas se não estiver vazio
 
 3. **Região**
    - CEP: Formato válido
