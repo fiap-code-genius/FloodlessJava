@@ -1,5 +1,11 @@
 # Floodless - Sistema de Gerenciamento de Enchentes
 
+## Equipe
+
+ - Wesley Sena | RM: 558043
+ - Vanessa Yukari | RM: 558092
+ - Samara Victoria | RM: 558719
+
 ## 📋 Sobre o Projeto
 
 O Floodless é um sistema destinado a auxiliar pessoas vítimas de enchentes, oferecendo funcionalidades para monitoramento de áreas de risco, gerenciamento de abrigos e notificações em tempo real. O sistema utiliza APIs externas para obter dados meteorológicos e geográficos, permitindo um acompanhamento preciso das condições climáticas em diferentes regiões.
@@ -851,4 +857,9 @@ O sistema utiliza SLF4J para logging com diferentes níveis:
 - Criação: Sempre não lida
 - Marcação como lida: Individual ou em lote
 - Ordenação: Por urgência e data
-- Filtros: Por região, usuário, status 
+- Filtros: Por região, usuário, status
+
+## Links
+
+- Aprensentação da solução: https://youtu.be/8OtP5Eza9uE
+- Deploy no Render: https://floodless.onrender.com/floodless/swagger-ui/swagger-ui/index.html#/
