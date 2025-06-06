@@ -862,4 +862,4 @@ O sistema utiliza SLF4J para logging com diferentes níveis:
 ## Links
 
 - Aprensentação da solução: https://youtu.be/8OtP5Eza9uE
-- Deploy no Render: https://floodless.onrender.com/floodless/swagger-ui/swagger-ui/index.html#/
+- Deploy no Render: https://floodless.onrender.com/floodless/swagger-ui/swagger-ui/index.html#/ (Pode demorar um pouco para abrir a interface)
